@@ -1,0 +1,15 @@
+error: join of a non-constant path
+  --> $DIR/without_use.rs:7:17
+   |
+LL |     let _ = dir.join(path);
+   |                 ^^^^^^^^^^
+   |
+   = note: `-D safe-join-opportunity` implied by `-D warnings`
+help: add `use safe_join::SafeJoin;` to the file and change this to `safe_join` or adjust the surrounding code so that `try_safe_join` can be used
+  --> $DIR/without_use.rs:7:17
+   |
+LL |     let _ = dir.join(path);
+   |                 ^^^^
+
+error: aborting due to previous error
+

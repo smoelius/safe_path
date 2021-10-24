@@ -1,0 +1,84 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  repository:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Prettier
+        run: npm install -g prettier && prettier --check '**/*.yml'
+
+      - uses: gaurav-nelson/github-action-markdown-link-check@v1
+
+      - name: Format README
+        run: |
+          cargo install cargo-readme
+          ./scripts/update_readme.sh && git diff --exit-code
+
+  package:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        dir: [".", "lint"]
+
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install dylint-link
+        run: cargo install dylint-link
+
+      - name: Cargo sort
+        run: |
+          cargo install cargo-sort
+          cargo sort --check --grouped
+
+      - name: Format
+        run: |
+          rustup component add rustfmt
+          cargo fmt && git diff --exit-code
+
+      - name: License
+        run: |
+          cargo install cargo-license
+          cargo license | while read X; do echo "$X" | grep -w 'Apache\|ISC\|MIT\|N/A'; done
+
+      - name: Clippy
+        run: |
+          rustup component add clippy
+          cargo clippy -- -W clippy::pedantic
+          if [[ '${{ matrix.dir }}' = '.' ]]; then
+            cargo clippy --features=camino -- -W clippy::pedantic
+          fi
+
+      - name: Test
+        run: |
+          cargo test
+          if [[ '${{ matrix.dir }}' = '.' ]]; then
+            cargo test --features=camino
+          fi
+
+      - name: Test documentation
+        # smoelius: The `cdylib` -> `lib` trick is due to @MinerSebas.
+        run: |
+          sed -i 's/"cdylib"/"lib"/g' Cargo.toml
+          cargo test --doc
+
+      - name: Udeps
+        run: |
+          cargo install cargo-udeps
+          TOOLCHAIN=
+          if [[ '${{ matrix.dir }}' = '.' ]]; then
+            rustup toolchain install nightly
+            TOOLCHAIN='+nightly'
+            cargo $TOOLCHAIN udeps --tests --features=camino
+          fi
+          cargo $TOOLCHAIN udeps --tests

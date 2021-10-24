@@ -1,0 +1,40 @@
+[package]
+name = "safe_join_lint"
+version = "0.1.0"
+authors = ["authors go here"]
+description = "decription goes here"
+edition = "2018"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[[example]]
+name = "with_use"
+path = "ui/with_use.rs"
+
+[[example]]
+name = "without_use"
+path = "ui/without_use.rs"
+
+[[example]]
+name = "without_use_mod"
+path = "ui/without_use_mod.rs"
+
+[dependencies]
+clippy_utils = { git = "https://github.com/rust-lang/rust-clippy", tag = "rust-1.55.0" }
+dylint_linting = "1.0.7"
+if_chain = "1.0.2"
+
+safe_join = { path = ".." }
+
+[dev-dependencies]
+anyhow = "1.0.44"
+dylint_testing = "1.0.7"
+libloading = "0.7.1"
+
+[package.metadata.cargo-udeps.ignore]
+development = ["libloading"]
+
+[package.metadata.rust-analyzer]
+rustc_private = true
