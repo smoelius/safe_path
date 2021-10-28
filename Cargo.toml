@@ -11,5 +11,12 @@ description = "To help prevent directory traversal attacks"
 [dependencies]
 camino = { version = "1.0.5", optional = true }
 
+[dev-dependencies]
+cargo-util = "0.1.1"
+lexiclean = "0.0.1"
+path-clean = "0.1.0"
+serde = "1.0.130"
+test-fuzz = "1.0.2"
+
 [features]
 default = []

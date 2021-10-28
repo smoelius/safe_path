@@ -18,5 +18,4 @@ sed -i 's/\[\(`SafeJoin::[^`]*`\)\]/\1/g' README.md
 
 # smoelius: Fix reference-style links.
 sed -i 's,^\(\[components\]\): .*$,\1: https://doc.rust-lang.org/std/path/enum.Component.html,' README.md
-sed -i 's,^\(\[`io::Result`\]\): .*$,\1: https://doc.rust-lang.org/std/io/type.Result.html,' README.md
 sed -i 's,^\(\[`Path::join`\]\): .*$,\1: https://doc.rust-lang.org/std/path/struct.Path.html#method.join,' README.md

@@ -5,128 +5,80 @@ LL |     let _ = dir.join(path);
    |                 ^^^^^^^^^^
    |
    = note: `-D safe-join-opportunity` implied by `-D warnings`
-help: change this to `safe_join` or adjust the surrounding code so that `try_safe_join` can be used
+help: adjust the surrounding code so that this can be changed to `safe_join(path)?`
   --> $DIR/with_use.rs:14:17
    |
 LL |     let _ = dir.join(path);
    |                 ^^^^
 
-error: the argument of this call to `try_safe_join` causes it to necessarily return an error
+error: this call to `safe_join` will return an error if the receiver is not `/`
   --> $DIR/with_use.rs:20:17
-   |
-LL |     let _ = dir.try_safe_join("/");
-   |                 ^^^^^^^^^^^^^^^^^^
-   |
-   = note: `-D safe-join-misapplication` implied by `-D warnings`
-help: if returning an error is not intended, change this to `join`
-  --> $DIR/with_use.rs:20:17
-   |
-LL |     let _ = dir.try_safe_join("/");
-   |                 ^^^^^^^^^^^^^
-
-error: the argument of this call to `try_safe_join` causes it to necessarily return an error
-  --> $DIR/with_use.rs:22:17
-   |
-LL |     let _ = dir.try_safe_join("..");
-   |                 ^^^^^^^^^^^^^^^^^^^
-   |
-help: if returning an error is not intended, change this to `join`
-  --> $DIR/with_use.rs:22:17
-   |
-LL |     let _ = dir.try_safe_join("..");
-   |                 ^^^^^^^^^^^^^
-
-error: the argument of this call to `try_safe_join` causes it to necessarily return an error
-  --> $DIR/with_use.rs:25:17
-   |
-LL |     let _ = dir.try_safe_join(ROOT_DIR);
-   |                 ^^^^^^^^^^^^^^^^^^^^^^^
-   |
-help: if returning an error is not intended, change this to `join`
-  --> $DIR/with_use.rs:25:17
-   |
-LL |     let _ = dir.try_safe_join(ROOT_DIR);
-   |                 ^^^^^^^^^^^^^
-
-error: the argument of this call to `try_safe_join` causes it to necessarily return an error
-  --> $DIR/with_use.rs:27:17
-   |
-LL |     let _ = dir.try_safe_join(PARENT_DIR);
-   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-help: if returning an error is not intended, change this to `join`
-  --> $DIR/with_use.rs:27:17
-   |
-LL |     let _ = dir.try_safe_join(PARENT_DIR);
-   |                 ^^^^^^^^^^^^^
-
-error: the argument of this call to `safe_join` causes it to necessarily panic
-  --> $DIR/with_use.rs:30:17
    |
 LL |     let _ = dir.safe_join("/");
    |                 ^^^^^^^^^^^^^^
    |
-help: if panicking is not intended, change this to `join`
-  --> $DIR/with_use.rs:30:17
+   = note: `-D safe-join-misapplication` implied by `-D warnings`
+help: if such behavior is not intended, change this to `join`
+  --> $DIR/with_use.rs:20:17
    |
 LL |     let _ = dir.safe_join("/");
    |                 ^^^^^^^^^
 
-error: the argument of this call to `safe_join` causes it to necessarily panic
-  --> $DIR/with_use.rs:32:17
+error: this call to `safe_join` will return an error if the receiver is not `/`
+  --> $DIR/with_use.rs:22:17
    |
 LL |     let _ = dir.safe_join("..");
    |                 ^^^^^^^^^^^^^^^
    |
-help: if panicking is not intended, change this to `join`
-  --> $DIR/with_use.rs:32:17
+help: if such behavior is not intended, change this to `join`
+  --> $DIR/with_use.rs:22:17
    |
 LL |     let _ = dir.safe_join("..");
    |                 ^^^^^^^^^
 
-error: the argument of this call to `safe_join` causes it to necessarily panic
-  --> $DIR/with_use.rs:35:17
+error: this call to `safe_join` will return an error if the receiver is not `/`
+  --> $DIR/with_use.rs:25:17
    |
 LL |     let _ = dir.safe_join(ROOT_DIR);
    |                 ^^^^^^^^^^^^^^^^^^^
    |
-help: if panicking is not intended, change this to `join`
-  --> $DIR/with_use.rs:35:17
+help: if such behavior is not intended, change this to `join`
+  --> $DIR/with_use.rs:25:17
    |
 LL |     let _ = dir.safe_join(ROOT_DIR);
    |                 ^^^^^^^^^
 
-error: the argument of this call to `safe_join` causes it to necessarily panic
-  --> $DIR/with_use.rs:37:17
+error: this call to `safe_join` will return an error if the receiver is not `/`
+  --> $DIR/with_use.rs:27:17
    |
 LL |     let _ = dir.safe_join(PARENT_DIR);
    |                 ^^^^^^^^^^^^^^^^^^^^^
    |
-help: if panicking is not intended, change this to `join`
-  --> $DIR/with_use.rs:37:17
+help: if such behavior is not intended, change this to `join`
+  --> $DIR/with_use.rs:27:17
    |
 LL |     let _ = dir.safe_join(PARENT_DIR);
    |                 ^^^^^^^^^
 
 error: join of a non-constant path
-  --> $DIR/with_use.rs:45:12
+  --> $DIR/with_use.rs:35:12
    |
 LL |     Ok(dir.join(path).to_path_buf())
    |            ^^^^^^^^^^
    |
-   = help: change this to `try_safe_join(path)?`
+   = help: change this to `safe_join(path)?`
 
 error: join of a non-constant path
-  --> $DIR/with_use.rs:52:12
+  --> $DIR/with_use.rs:42:12
    |
 LL |     Ok(dir.join(path).to_path_buf())
    |            ^^^^^^^^^^
    |
-help: change this to `safe_join` or adjust the surrounding code so that `try_safe_join` can be used
-  --> $DIR/with_use.rs:52:12
+help: adjust the surrounding code so that this can be changed to `safe_join(path)?`
+  --> $DIR/with_use.rs:42:12
    |
 LL |     Ok(dir.join(path).to_path_buf())
    |            ^^^^
 
-error: aborting due to 11 previous errors
+error: aborting due to 7 previous errors
 
