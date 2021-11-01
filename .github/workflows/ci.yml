@@ -49,7 +49,7 @@ jobs:
       - name: License
         run: |
           cargo install cargo-license
-          cargo license | while read X; do echo "$X" | grep -w 'Apache\|ISC\|MIT\|N/A'; done
+          cargo license | while read X; do echo "$X" | grep -w 'Apache\|CC0\|ISC\|MIT\|N/A'; done
 
       - name: Clippy
         run: |

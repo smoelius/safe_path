@@ -17,16 +17,6 @@ fn main() {
 
     let _ = bar().unwrap();
 
-    let _ = dir.try_safe_join("/");
-    let _ = dir.try_safe_join(".");
-    let _ = dir.try_safe_join("..");
-    let _ = dir.try_safe_join("y");
-
-    let _ = dir.try_safe_join(ROOT_DIR);
-    let _ = dir.try_safe_join(CUR_DIR);
-    let _ = dir.try_safe_join(PARENT_DIR);
-    let _ = dir.try_safe_join(NORMAL);
-
     let _ = dir.safe_join("/");
     let _ = dir.safe_join(".");
     let _ = dir.safe_join("..");

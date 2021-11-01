@@ -33,52 +33,58 @@ declare_lint! {
     /// **Example:**
     ///
     /// ```no_run
+    /// # use anyhow::Result;
     /// # use std::{env::current_dir, io::{Read, stdin}};
+    /// # fn main() -> Result<()> {
     /// let mut filename = String::new();
-    /// let _ = stdin().read_to_string(&mut filename).unwrap();
+    /// let _ = stdin().read_to_string(&mut filename)?;
     /// let path = current_dir().unwrap().join("lib").join(filename);
-    /// let lib = unsafe { libloading::Library::new(path) }.unwrap();
+    /// let lib = unsafe { libloading::Library::new(path) }?;
+    /// # Ok(())
+    /// # }
     /// ```
     /// Use instead:
     /// ```no_run
+    /// # use anyhow::Result;
     /// # use safe_join::SafeJoin;
     /// # use std::{env::current_dir, io::{Read, stdin}};
+    /// # fn main() -> Result<()> {
     /// let mut filename = String::new();
-    /// let _ = stdin().read_to_string(&mut filename).unwrap();
-    /// let path = current_dir().unwrap().join("lib").safe_join(filename);
-    /// let lib = unsafe { libloading::Library::new(path) }.unwrap();
+    /// let _ = stdin().read_to_string(&mut filename)?;
+    /// let path = current_dir().unwrap().join("lib").safe_join(filename)?;
+    /// let lib = unsafe { libloading::Library::new(path) }?;
+    /// # Ok(())
+    /// # }
     /// ```
     pub SAFE_JOIN_OPPORTUNITY,
     Warn,
-    "calls where `safe_join` or `try_safe_join` could be used"
+    "calls where `safe_join` could be used"
 }
 
 declare_lint! {
-    /// **What it does:** Checks for calls to `SafeJoin::safe_join` that necessarily panic, and
-    /// calls `SafeJoin::try_safe_join` that necessarily return an error.
+    /// **What it does:** Checks for calls to `SafeJoin::safe_join` that return an error when the
+    /// receiver is not `/`.
     ///
-    /// **Why is this bad?** Always panicking or always returning is error is likely not what the
-    /// programmer intended.
+    /// **Why is this bad?** Such behavior is likely not what the programmer intended. There are
+    /// simpler ways to check whether the receiver is `/`, if this is what the programmer intended.
     ///
     /// **Known problems:** None.
     ///
     /// **Example:**
     ///
-    /// ```should_panic
+    /// ```
     /// # use safe_join::SafeJoin;
     /// # let dir = std::path::PathBuf::new();
     /// let path = dir.safe_join("..");
-    /// let other = dir.try_safe_join("..").unwrap();
     /// ```
     /// Use instead:
     /// ```
     /// # let dir = std::path::PathBuf::new();
     /// let path = dir.join("..");
-    /// let other = dir.join("..");
     /// ```
     pub SAFE_JOIN_MISAPPLICATION,
     Warn,
-    "calls where `safe_join` or `try_safe_join` should not be used"
+    "calls where `safe_join` that are likely erroneous"
 }
 
 declare_lint_pass!(SafeJoinLint => [SAFE_JOIN_OPPORTUNITY, SAFE_JOIN_MISAPPLICATION]);
@@ -86,7 +92,6 @@ declare_lint_pass!(SafeJoinLint => [SAFE_JOIN_OPPORTUNITY, SAFE_JOIN_MISAPPLICAT
 const UTF8PATH_JOIN: [&str; 3] = ["camino", "Utf8Path", "join"];
 const SAFE_JOIN_TRAIT: [&str; 2] = ["safe_join", "SafeJoin"];
 const SAFE_JOIN: [&str; 3] = ["safe_join", "SafeJoin", "safe_join"];
-const TRY_SAFE_JOIN: [&str; 3] = ["safe_join", "SafeJoin", "try_safe_join"];
 const IO_ERROR: [&str; 4] = ["std", "io", "error", "Error"];
 const PATH_JOIN: [&str; 4] = ["std", "path", "Path", "join"];
 
@@ -140,7 +145,7 @@ fn check_safe_join_opportunity(
                     "join of a non-constant path",
                     None,
                     &format!(
-                        "{}change this to `try_safe_join({})?`",
+                        "{}change this to `safe_join({})?`",
                         import_msg, arg_snippet
                     ),
                 );
@@ -151,7 +156,7 @@ fn check_safe_join_opportunity(
                     method_arg_span,
                     "join of a non-constant path",
                     Some(method_span),
-                    &format!("{}change this to `safe_join` or adjust the surrounding code so that `try_safe_join` can be used", import_msg),
+                    &format!("{}adjust the surrounding code so that this can be changed to `safe_join({})?`", import_msg, arg_snippet),
                 );
             };
         }
@@ -167,24 +172,18 @@ fn check_safe_join_misapplication(
     method_arg_span: Span,
     _arg_snippet: &str,
 ) {
-    let is_safe_join = match_def_path(cx, method_def_id, &SAFE_JOIN);
     if_chain! {
-        if is_safe_join || match_def_path(cx, method_def_id, &TRY_SAFE_JOIN);
+        if match_def_path(cx, method_def_id, &SAFE_JOIN);
         if let Some(Constant::Str(s)) = constant_context(cx, cx.typeck_results()).expr(arg);
-        if Path::new(&s).check_join_safety().is_err();
+        if !Path::new(".").is_safe_to_join(s.as_ref());
         then {
-            let (method_name, verb_phrase, gerund) = if is_safe_join {
-                ("safe_join", "panic", "panicking")
-            } else {
-                ("try_safe_join", "return an error", "returning an error")
-            };
             span_lint_and_help(
                 cx,
                 SAFE_JOIN_MISAPPLICATION,
                 method_arg_span,
-                &format!("the argument of this call to `{}` causes it to necessarily {}", method_name, verb_phrase),
+                &format!("this call to `safe_join` will return an error if the receiver is not `/`"),
                 Some(method_span),
-                &format!("if {} is not intended, change this to `join`", gerund),
+                &format!("if such behavior is not intended, change this to `join`"),
             );
         }
     }
