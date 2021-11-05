@@ -1,7 +1,7 @@
 //! Use [`SafeJoin::safe_join`] in place of [`Path::join`] to help prevent directory traversal
 //! attacks.
 //!
-//! A call of the form `dir.safe_join(path)` returns and error if any prefix of `path` refers to a
+//! A call of the form `dir.safe_join(path)` returns an error if any prefix of `path` refers to a
 //! directory outside of `dir`.
 //!
 //! Example:
