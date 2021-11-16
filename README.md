@@ -1,25 +1,45 @@
-# safe_join
+# safe_path
 
-Use `SafeJoin::safe_join` in place of [`Path::join`] to help prevent directory traversal
-attacks.
+Use `SafePath::safe_join` and `SafePath::safe_parent` in place of [`Path::join`] and
+[`Path::parent`] (respectively) to help prevent directory traversal attacks:
 
-A call of the form `dir.safe_join(path)` returns an error if any prefix of `path` refers to a
-directory outside of `dir`.
+* A call of the form `dir.safe_join(path)` returns an error if, for some prefix `prefix` of
+  `path`, `dir.join(prefix)` refers to a file outside of `dir`, or if `dir.join(path)` is `dir`.
+* A call of the form `dir.safe_parent()` returns an error if `dir.parent()` refers to a file
+  inside of `dir`, or if `dir.parent()` is `Some(dir)`.
 
-Example:
+Examples:
 ```rust
 assert!(home_dir.join("Documents").safe_join("../.bash_logout").is_err());
+assert!(home_dir.join("Documents").join("..").safe_parent().is_err());
+```
+
+`SafePath::relaxed_safe_join` and `SafePath::relaxed_safe_parent` are variants of
+`SafePath::safe_join` and `SafePath::safe_parent` (respectively) that drop the requirement
+that the result is not `self`:
+```rust
+assert!(home_dir.join("Documents").safe_join(".").is_err());
+assert!(home_dir.join("Documents").relaxed_safe_join(".").is_ok());
+
+assert!(Path::new("/").safe_parent().is_err());
+assert!(Path::new("/").relaxed_safe_parent().is_ok());
 ```
 
 ### Detailed explanation
 
-`safe_join` tries to provide the following guarantee:
+We'll explain `relaxed_safe_join` in detail since its requirements are slightly simpler than
+those of `safe_join`.
+
+`relaxed_safe_join` tries to provide the following guarantee:
 ```rust
-dir.safe_join(path).is_ok()
+dir.relaxed_safe_join(path).is_ok()
 ```
 if-and-only-if, for every prefix `prefix` of `path`,
 ```rust
-normalize(paternalize_n_x(dir.join(prefix))).starts_with(normalize(paternalize_n_x(dir)))
+normalize(paternalize_n_x(dir.join(prefix)))
+    .starts_with(
+        normalize(paternalize_n_x(dir))
+    )
 ```
 where the `paternalize_n_x` and `normalize` functions are as follows.
 
@@ -46,18 +66,34 @@ as the `normalize` function.
 * [`lexiclean::Lexiclean::lexiclean`]
 * [`path_clean::PathClean::clean`]\*
 
-\* [`path_clean::PathClean::clean`] uses strings internally, so it only works with UTF-8 paths.
+The guarantee that `relaxed_safe_parent` tries to provide is similar:
+```rust
+dir.relaxed_safe_parent().is_ok()
+```
+if-and-only-if
+```rust
+match dir.parent() {
+    None => true,
+    Some(parent) => {
+        normalize(paternalize_m_x(dir))
+            .starts_with(
+                normalize(paternalize_m_x(parent))
+            )
+    }
+}
+```
+where *m* is the total number of components in `dir`.
 
 ### Limitations
 
-**`safe_join` does not consult the filesystem.** So, for example, in a call of the form
+**`safe_path` does not consult the filesystem.** So, for example, in a call of the form
 `dir.safe_join(path)`, `safe_join` would not consider:
 
 * whether `dir` is a directory
 * whether `path` refers to a symlink
 
 There are a host of problems that come with consulting the filesystem. For example, a
-programmer might construct a path for a filesystem that is not yet mounted. We want `safe_join`
+programmer might construct a path for a filesystem that is not yet mounted. We want `safe_path`
 to be applicable in such situations. So we have chosen to adopt a simple semantics that
 considers only a path's [components].
 
@@ -65,19 +101,22 @@ A similar crate that *does* consult the filesystem is [`canonical_path`].
 
 ### Camino
 
-`safe_join` optionally supports [`camino::Utf8Path`]. To take advantage of this feature, enable
-it on your `Cargo.toml` file's `safe_join` dependency:
+`safe_path` optionally supports [`camino::Utf8Path`]. To take advantage of this feature, enable
+it on your `Cargo.toml` file's `safe_path` dependency:
 ```toml
-safe_join = { version = "0.1", features = ["camino"] }
+safe_path = { version = "0.1", features = ["camino"] }
 ```
 
 ### Linting
 
-The `safe_join` repository includes a [Dylint] library to check for:
+The `safe_path` repository includes a [Dylint] library to check for:
 
-* calls to [`Path::join`] where `SafeJoin::safe_join` could be used
-* calls to `SafeJoin::safe_join` that are likely erroneous because they return an error under
-  normal circumstances (e.g., `safe_join("..")`)
+* calls to [`Path::join`] where `SafePath::safe_join` or `SafePath::relaxed_safe_join` could be
+  used
+* calls to [`Path::parent`] where `SafePath::safe_parent` or `SafePath::relaxed_safe_parent` could
+  be used
+* calls to `SafePath::safe_join`/`SafePath::relaxed_safe_join` that are likely erroneous because
+  they return an error under normal circumstances, e.g., `safe_join("..")`
 
 To use the library:
 
@@ -89,19 +128,24 @@ To use the library:
   ```toml
   [workspace.metadata.dylint]
   libraries = [
-      { git = "https://github.com/trailofbits/safe_join", pattern = "lint" },
+      { git = "https://github.com/trailofbits/safe_path", pattern = "lint" },
   ]
   ```
 * Run `cargo-dylint` from your workspace's root directory:
   ```sh
-  cargo dylint safe_join_lint --workspace
+  cargo dylint safe_path_lint --workspace
   ```
 
 ### References
 
 * [Reddit: Anyone knows how to `fs::canonicalize`, but without actually checking that file exists?](https://www.reddit.com/r/rust/comments/hkkquy/anyone_knows_how_to_fscanonicalize_but_without/)
 * [rust-lang/rust: `Path::join` should concat paths even if the second path is absolute #16507](https://github.com/rust-lang/rust/issues/16507)
+* [rust-lang/rust: parent() returns Some("") for single-component relative paths #36861](https://github.com/rust-lang/rust/issues/36861)
 * [Stack Overflow: Getting the absolute path from a `PathBuf`](https://stackoverflow.com/questions/30511331/getting-the-absolute-path-from-a-pathbuf)
+
+### Notes
+
+\* [`path_clean::PathClean::clean`] uses strings internally, so it only works with UTF-8 paths.
 
 [`camino::Utf8Path`]: https://docs.rs/camino/1.0.5/camino/struct.Utf8Path.html
 [`canonical_path`]: https://docs.rs/canonical_path
@@ -109,9 +153,9 @@ To use the library:
 [components]: https://doc.rust-lang.org/std/path/enum.Component.html
 [Dylint]: https://github.com/trailofbits/dylint
 [`Path::join`]: https://doc.rust-lang.org/std/path/struct.Path.html#method.join
+[`Path::parent`]: https://doc.rust-lang.org/std/path/struct.Path.html#method.parent
 [`lexiclean::Lexiclean::lexiclean`]: https://docs.rs/lexiclean/0.0.1/lexiclean/trait.Lexiclean.html#tymethod.lexiclean
 [`path_clean::PathClean::clean`]: https://docs.rs/path-clean/0.1.0/path_clean/trait.PathClean.html#tymethod.clean
 [README]: https://github.com/trailofbits/dylint/blob/master/README.md
-[`safe_join` lints]: #linting
 
 License: MIT OR Apache-2.0

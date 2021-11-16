@@ -2,6 +2,10 @@ name: CI
 
 on: [push, pull_request]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   repository:
     runs-on: ubuntu-latest
@@ -33,6 +37,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Features
+        if: ${{ matrix.dir == '.' }}
+        run: echo 'FEATURES=--features=camino' >> $GITHUB_ENV
+
       - name: Install dylint-link
         run: cargo install dylint-link
 
@@ -54,17 +62,11 @@ jobs:
       - name: Clippy
         run: |
           rustup component add clippy
-          cargo clippy -- -W clippy::pedantic
-          if [[ '${{ matrix.dir }}' = '.' ]]; then
-            cargo clippy --features=camino -- -W clippy::pedantic
-          fi
+          cargo clippy $FEATURES -- -D warnings -W clippy::pedantic
 
       - name: Test
         run: |
-          cargo test
-          if [[ '${{ matrix.dir }}' = '.' ]]; then
-            cargo test --features=camino
-          fi
+          cargo test $FEATURES
 
       - name: Test documentation
         # smoelius: The `cdylib` -> `lib` trick is due to @MinerSebas.
@@ -74,11 +76,11 @@ jobs:
 
       - name: Udeps
         run: |
-          cargo install cargo-udeps
+          # smoelius: The `rust-toolchain` file can interfere with the installation of `cargo-udeps`.
+          cargo +stable install cargo-udeps
           TOOLCHAIN=
           if [[ '${{ matrix.dir }}' = '.' ]]; then
             rustup toolchain install nightly
             TOOLCHAIN='+nightly'
-            cargo $TOOLCHAIN udeps --tests --features=camino
           fi
-          cargo $TOOLCHAIN udeps --tests
+          cargo clean && cargo $TOOLCHAIN udeps --tests $FEATURES

@@ -5,80 +5,168 @@ LL |     let _ = dir.join(path);
    |                 ^^^^^^^^^^
    |
    = note: `-D safe-join-opportunity` implied by `-D warnings`
-help: adjust the surrounding code so that this can be changed to `safe_join(path)?`
-  --> $DIR/with_use.rs:14:17
-   |
-LL |     let _ = dir.join(path);
-   |                 ^^^^
+   = help: adjust the surrounding code so that `safe_join(path)?` or `relaxed_safe_join(path)?` can be used
 
-error: this call to `safe_join` will return an error if the receiver is not `/`
-  --> $DIR/with_use.rs:20:17
+error: parent of a non-constant path
+  --> $DIR/with_use.rs:16:17
+   |
+LL |     let _ = dir.parent();
+   |                 ^^^^^^^^
+   |
+   = help: adjust the surrounding code so that `safe_parent()?` or `relaxed_safe_parent()?` can be used
+
+error: this call to `safe_join` will always return an error
+  --> $DIR/with_use.rs:18:17
    |
 LL |     let _ = dir.safe_join("/");
    |                 ^^^^^^^^^^^^^^
    |
    = note: `-D safe-join-misapplication` implied by `-D warnings`
-help: if such behavior is not intended, change this to `join`
-  --> $DIR/with_use.rs:20:17
+help: if such behavior is not intended, use `join`
+  --> $DIR/with_use.rs:18:17
    |
 LL |     let _ = dir.safe_join("/");
    |                 ^^^^^^^^^
 
-error: this call to `safe_join` will return an error if the receiver is not `/`
-  --> $DIR/with_use.rs:22:17
+error: this call to `safe_join` will always return an error
+  --> $DIR/with_use.rs:19:17
+   |
+LL |     let _ = dir.safe_join(".");
+   |                 ^^^^^^^^^^^^^^
+   |
+help: if such behavior is not intended, use `join`
+  --> $DIR/with_use.rs:19:17
+   |
+LL |     let _ = dir.safe_join(".");
+   |                 ^^^^^^^^^
+
+error: this call to `safe_join` will always return an error
+  --> $DIR/with_use.rs:20:17
    |
 LL |     let _ = dir.safe_join("..");
    |                 ^^^^^^^^^^^^^^^
    |
-help: if such behavior is not intended, change this to `join`
-  --> $DIR/with_use.rs:22:17
+help: if such behavior is not intended, use `join`
+  --> $DIR/with_use.rs:20:17
    |
 LL |     let _ = dir.safe_join("..");
    |                 ^^^^^^^^^
 
-error: this call to `safe_join` will return an error if the receiver is not `/`
-  --> $DIR/with_use.rs:25:17
+error: this call to `safe_join` will always return an error
+  --> $DIR/with_use.rs:23:17
    |
 LL |     let _ = dir.safe_join(ROOT_DIR);
    |                 ^^^^^^^^^^^^^^^^^^^
    |
-help: if such behavior is not intended, change this to `join`
-  --> $DIR/with_use.rs:25:17
+help: if such behavior is not intended, use `join`
+  --> $DIR/with_use.rs:23:17
    |
 LL |     let _ = dir.safe_join(ROOT_DIR);
    |                 ^^^^^^^^^
 
-error: this call to `safe_join` will return an error if the receiver is not `/`
-  --> $DIR/with_use.rs:27:17
+error: this call to `safe_join` will always return an error
+  --> $DIR/with_use.rs:24:17
+   |
+LL |     let _ = dir.safe_join(CUR_DIR);
+   |                 ^^^^^^^^^^^^^^^^^^
+   |
+help: if such behavior is not intended, use `join`
+  --> $DIR/with_use.rs:24:17
+   |
+LL |     let _ = dir.safe_join(CUR_DIR);
+   |                 ^^^^^^^^^
+
+error: this call to `safe_join` will always return an error
+  --> $DIR/with_use.rs:25:17
    |
 LL |     let _ = dir.safe_join(PARENT_DIR);
    |                 ^^^^^^^^^^^^^^^^^^^^^
    |
-help: if such behavior is not intended, change this to `join`
-  --> $DIR/with_use.rs:27:17
+help: if such behavior is not intended, use `join`
+  --> $DIR/with_use.rs:25:17
    |
 LL |     let _ = dir.safe_join(PARENT_DIR);
    |                 ^^^^^^^^^
 
+error: this call to `relaxed_safe_join` will return an error if the receiver is not `/`
+  --> $DIR/with_use.rs:28:17
+   |
+LL |     let _ = dir.relaxed_safe_join("/");
+   |                 ^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: if such behavior is not intended, use `join`
+  --> $DIR/with_use.rs:28:17
+   |
+LL |     let _ = dir.relaxed_safe_join("/");
+   |                 ^^^^^^^^^^^^^^^^^
+
+error: this call to `relaxed_safe_join` will return an error if the receiver is not `/`
+  --> $DIR/with_use.rs:30:17
+   |
+LL |     let _ = dir.relaxed_safe_join("..");
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: if such behavior is not intended, use `join`
+  --> $DIR/with_use.rs:30:17
+   |
+LL |     let _ = dir.relaxed_safe_join("..");
+   |                 ^^^^^^^^^^^^^^^^^
+
+error: this call to `relaxed_safe_join` will return an error if the receiver is not `/`
+  --> $DIR/with_use.rs:33:17
+   |
+LL |     let _ = dir.relaxed_safe_join(ROOT_DIR);
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: if such behavior is not intended, use `join`
+  --> $DIR/with_use.rs:33:17
+   |
+LL |     let _ = dir.relaxed_safe_join(ROOT_DIR);
+   |                 ^^^^^^^^^^^^^^^^^
+
+error: this call to `relaxed_safe_join` will return an error if the receiver is not `/`
+  --> $DIR/with_use.rs:35:17
+   |
+LL |     let _ = dir.relaxed_safe_join(PARENT_DIR);
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: if such behavior is not intended, use `join`
+  --> $DIR/with_use.rs:35:17
+   |
+LL |     let _ = dir.relaxed_safe_join(PARENT_DIR);
+   |                 ^^^^^^^^^^^^^^^^^
+
 error: join of a non-constant path
-  --> $DIR/with_use.rs:35:12
+  --> $DIR/with_use.rs:48:12
    |
 LL |     Ok(dir.join(path).to_path_buf())
    |            ^^^^^^^^^^
    |
-   = help: change this to `safe_join(path)?`
+   = help: use `safe_join(path)?` or `relaxed_safe_join(path)?`
 
 error: join of a non-constant path
-  --> $DIR/with_use.rs:42:12
+  --> $DIR/with_use.rs:55:12
    |
 LL |     Ok(dir.join(path).to_path_buf())
    |            ^^^^^^^^^^
    |
-help: adjust the surrounding code so that this can be changed to `safe_join(path)?`
-  --> $DIR/with_use.rs:42:12
-   |
-LL |     Ok(dir.join(path).to_path_buf())
-   |            ^^^^
+   = help: adjust the surrounding code so that `safe_join(path)?` or `relaxed_safe_join(path)?` can be used
 
-error: aborting due to 7 previous errors
+error: parent of a non-constant path
+  --> $DIR/with_use.rs:61:12
+   |
+LL |     Ok(dir.parent().map(Path::to_path_buf))
+   |            ^^^^^^^^
+   |
+   = help: use `safe_parent()?` or `relaxed_safe_parent()?`
+
+error: parent of a non-constant path
+  --> $DIR/with_use.rs:67:12
+   |
+LL |     Ok(dir.parent().map(Path::to_path_buf))
+   |            ^^^^^^^^
+   |
+   = help: adjust the surrounding code so that `safe_parent()?` or `relaxed_safe_parent()?` can be used
+
+error: aborting due to 16 previous errors
 

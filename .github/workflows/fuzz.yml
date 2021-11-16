@@ -1,0 +1,55 @@
+name: Fuzz
+
+# Every Thursday at 3:00 UTC (Wednesday at 22:00 EST), fuzz `safe_join_guarantee` and
+# `safe_parent guarantee` for 10 minutes each.
+
+on:
+  schedule:
+    - cron: "0 3 * * 4"
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        target: [safe_join, safe_parent]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Cargo test-fuzz versions
+        run: cargo search cargo-test-fuzz | sort | tee cargo-test-fuzz_versions
+
+      # smoelius: The `~/.cargo/` entries are from:
+      # https://github.com/actions/cache/blob/main/examples.md#rust---cargo
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('cargo-test-fuzz_versions') }}
+
+      - uses: actions/cache@v2
+        with:
+          path: target/
+          key: ${{ runner.os }}-target-${{ hashFiles('Cargo.toml') }}
+
+      - name: Install llvm
+        run: sudo apt-get install llvm
+
+      - name: Install afl
+        run: cargo install afl || true
+
+      - name: Install cargo-test-fuzz
+        run: cargo install cargo-test-fuzz || true
+
+      - name: Cargo test-fuzz
+        run: |
+          cargo test      --features=fuzz ${{ matrix.target }}
+          cargo test-fuzz --features=fuzz ${{ matrix.target }}_guarantee --exit-code --run-until-crash -- -V 600
+        env:
+          AFL_AUTORESUME: 1
+          AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES: 1
