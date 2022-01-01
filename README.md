@@ -99,6 +99,20 @@ considers only a path's [components].
 
 A similar crate that *does* consult the filesystem is [`canonical_path`].
 
+### Performance
+
+Benchmarks suggest that `SafePath::safe_join` is about 3.5 times as slow as [`Path::join`],
+and that `SafePath::safe_parent` is about 5 times as slow as [`Path::parent`].
+
+However, benchmarks also suggest that normalizing and comparing [`Path::join`]'s `self` and
+result using the fastest of the above normalization functions (`normalize_path`) is about 1.5
+times slower still. Similarly, normalizing and comparing [`Path::parent`]'s `self` and result is
+about 1.2 times slower.
+
+So while using `SafePath::safe_join`/`SafePath::safe_parent` will cause a one to incur some
+slowdown, it seems to be less that what one would incur by implementing the same checks
+manually.
+
 ### Camino
 
 `safe_path` optionally supports [`camino::Utf8Path`]. To take advantage of this feature, enable

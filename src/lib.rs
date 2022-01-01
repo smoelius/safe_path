@@ -119,6 +119,20 @@
 //!
 //! A similar crate that *does* consult the filesystem is [`canonical_path`].
 //!
+//! ## Performance
+//!
+//! Benchmarks suggest that [`SafePath::safe_join`] is about 3.5 times as slow as [`Path::join`],
+//! and that [`SafePath::safe_parent`] is about 5 times as slow as [`Path::parent`].
+//!
+//! However, benchmarks also suggest that normalizing and comparing [`Path::join`]'s `self` and
+//! result using the fastest of the above normalization functions (`normalize_path`) is about 1.5
+//! times slower still. Similarly, normalizing and comparing [`Path::parent`]'s `self` and result is
+//! about 1.2 times slower.
+//!
+//! So while using [`SafePath::safe_join`]/[`SafePath::safe_parent`] will cause a one to incur some
+//! slowdown, it seems to be less that what one would incur by implementing the same checks
+//! manually.
+//!
 //! ## Camino
 //!
 //! `safe_path` optionally supports [`camino::Utf8Path`]. To take advantage of this feature, enable
@@ -192,7 +206,10 @@ pub trait PathOps: std::fmt::Debug {
     fn parent(&self) -> Option<&Self>;
 
     /// "Starts with" operation, e.g., [`std::path::Path::starts_with`]
-    fn starts_with<P: AsRef<Self>>(&self, base: P) -> bool;
+    ///
+    /// Note that `base` must implement `AsRef<std::path::Path>`, not `AsRef<Self>`. This is to be
+    /// consistent with [`camino::Utf8Path::starts_with`](https://docs.rs/camino/1.0.5/camino/struct.Utf8Path.html#method.starts_with).
+    fn starts_with<P: AsRef<std::path::Path>>(&self, base: P) -> bool;
 
     /// Returns `Ok(())` if, for every prefix `prefix` of `path`, `self.join(prefix)` refers to a
     /// file within `self`, and `relaxed` is true or `self.join(path)` is not `self`.
@@ -256,465 +273,107 @@ pub trait SafePath: PathOps {
 
 impl<P: ?Sized + PathOps> SafePath for P {}
 
-macro_rules! check_join_safety_body {
-    ($self: expr, $path: expr, $ty: path, $relaxed: expr) => {{
-        use $ty as Component;
-        let err = Err(Error::new(
-            ErrorKind::Other,
-            String::from("unsafe join operation"),
-        ));
-        let mut n = 0;
-        for component in $path.components() {
-            match component {
-                Component::Prefix(_) | Component::RootDir => {
-                    if !$self.is_root() {
-                        return err;
-                    }
-                    n = 0;
-                }
-                Component::CurDir => {}
-                Component::ParentDir => {
-                    if n <= 0 {
-                        if !$self.is_root() {
+macro_rules! impl_body {
+    {$component_ty: path} => {
+        fn join<P: AsRef<Self>>(&self, path: P) -> Self::PathBuf {
+            Self::join(self, path)
+        }
+
+        fn parent(&self) -> Option<&Self> {
+            Self::parent(self)
+        }
+
+        fn starts_with<P: AsRef<std::path::Path>>(&self, base: P) -> bool {
+            Self::starts_with(self, base)
+        }
+
+        fn check_join_safety(&self, path: &Self, relaxed: bool) -> Result<()> {
+            use $component_ty as Component;
+            let err = Err(Error::new(
+                ErrorKind::Other,
+                String::from("unsafe join operation"),
+            ));
+            let mut n = 0;
+            for component in path.components() {
+                match component {
+                    Component::Prefix(_) | Component::RootDir => {
+                        if !self.is_root() {
                             return err;
                         }
-                        continue;
+                        n = 0;
                     }
-                    n -= 1;
+                    Component::CurDir => {}
+                    Component::ParentDir => {
+                        if n <= 0 {
+                            if !self.is_root() {
+                                return err;
+                            }
+                            continue;
+                        }
+                        n -= 1;
+                    }
+                    Component::Normal(_) => n += 1,
                 }
-                Component::Normal(_) => n += 1,
+            }
+            if n > 0 || (relaxed && n == 0) {
+                Ok(())
+            } else {
+                err
             }
         }
-        if n > 0 || ($relaxed && n == 0) {
-            Ok(())
-        } else {
-            err
-        }
-    }};
-}
 
-macro_rules! check_parent_safety_body {
-    ($self: expr, $ty: path, $relaxed: expr) => {{
-        use $ty as Component;
-        let err = Err(Error::new(
-            ErrorKind::Other,
-            String::from("unsafe parent operation"),
-        ));
-        match $self.components().next_back() {
-            None | Some(Component::Prefix(_) | Component::RootDir | Component::CurDir) => {
-                if $relaxed {
-                    Ok(())
-                } else {
-                    err
+        fn check_parent_safety(&self, relaxed: bool) -> Result<()> {
+            use $component_ty as Component;
+            let err = Err(Error::new(
+                ErrorKind::Other,
+                String::from("unsafe parent operation"),
+            ));
+            match self.components().next_back() {
+                None | Some(Component::Prefix(_) | Component::RootDir | Component::CurDir) => {
+                    if relaxed {
+                        Ok(())
+                    } else {
+                        err
+                    }
                 }
-            }
-            Some(Component::ParentDir) => {
-                if $relaxed && $self.parent().map_or(true, |parent| parent.is_root()) {
-                    Ok(())
-                } else {
-                    err
+                Some(Component::ParentDir) => {
+                    if relaxed && self.parent().map_or(true, |parent| parent.is_root()) {
+                        Ok(())
+                    } else {
+                        err
+                    }
                 }
+                Some(Component::Normal(_)) => Ok(()),
             }
-            Some(Component::Normal(_)) => Ok(()),
         }
-    }};
-}
 
-macro_rules! is_root_body {
-    ($self: expr, $ty: path) => {{
-        use $ty as Component;
-        let mut n: Option<i32> = None;
-        for component in $self.components() {
-            match component {
-                Component::Prefix(_) | Component::RootDir => {
-                    n = Some(0);
+        fn is_root(&self) -> bool {
+            use $component_ty as Component;
+            let mut n: Option<i32> = None;
+            for component in self.components() {
+                match component {
+                    Component::Prefix(_) | Component::RootDir => {
+                        n = Some(0);
+                    }
+                    Component::CurDir => {}
+                    Component::ParentDir => n = n.map(|n| if n <= 0 { n } else { n - 1 }),
+                    Component::Normal(_) => n = n.map(|n| n + 1),
                 }
-                Component::CurDir => {}
-                Component::ParentDir => n = n.map(|n| if n <= 0 { n } else { n - 1 }),
-                Component::Normal(_) => n = n.map(|n| n + 1),
             }
+            n == Some(0)
         }
-        n == Some(0)
-    }};
+    }
 }
 
 impl PathOps for std::path::Path {
     type PathBuf = std::path::PathBuf;
-    fn join<P: AsRef<Self>>(&self, path: P) -> Self::PathBuf {
-        std::path::Path::join(self, path)
-    }
-    fn parent(&self) -> Option<&Self> {
-        std::path::Path::parent(self)
-    }
-    fn starts_with<P: AsRef<Self>>(&self, base: P) -> bool {
-        std::path::Path::starts_with(self, base)
-    }
-    fn check_join_safety(&self, path: &Self, relaxed: bool) -> Result<()> {
-        check_join_safety_body!(self, path, std::path::Component, relaxed)
-    }
-    fn check_parent_safety(&self, relaxed: bool) -> Result<()> {
-        check_parent_safety_body!(self, std::path::Component, relaxed)
-    }
-    fn is_root(&self) -> bool {
-        is_root_body!(self, std::path::Component)
-    }
+
+    impl_body! {std::path::Component}
 }
 
 #[cfg(feature = "camino")]
 impl PathOps for camino::Utf8Path {
     type PathBuf = camino::Utf8PathBuf;
-    fn join<P: AsRef<Self>>(&self, path: P) -> Self::PathBuf {
-        camino::Utf8Path::join(self, path)
-    }
-    fn parent(&self) -> Option<&Self> {
-        camino::Utf8Path::parent(self)
-    }
-    fn starts_with<P: AsRef<Self>>(&self, base: P) -> bool {
-        camino::Utf8Path::starts_with(self, base.as_ref())
-    }
-    fn check_join_safety(&self, path: &Self, relaxed: bool) -> Result<()> {
-        check_join_safety_body!(self, path, camino::Utf8Component, relaxed)
-    }
-    fn check_parent_safety(&self, relaxed: bool) -> Result<()> {
-        check_parent_safety_body!(self, camino::Utf8Component, relaxed)
-    }
-    fn is_root(&self) -> bool {
-        is_root_body!(self, camino::Utf8Component)
-    }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use cargo_util::paths::normalize_path;
-    use lexiclean::Lexiclean;
-    use path_clean::PathClean;
-    use std::{
-        cmp::max,
-        path::{Component, Path, PathBuf},
-    };
-
-    fn safe_join<P>(
-        from_str: impl Fn(&'static str) -> P::PathBuf,
-        as_std_path: impl Fn(&P) -> &Path,
-    ) where
-        P: ?Sized + PathOps + AsRef<P>,
-    {
-        let root = from_str("/");
-        let cur = from_str(".");
-        let parent = from_str("..");
-        let normal = from_str("x");
-        let dirs = &[
-            (true, root.clone()),
-            (true, root.as_ref().join(&parent)),
-            (true, root.as_ref().join(&normal).as_ref().join(&parent)),
-            (false, cur.clone()),
-            (false, normal.clone()),
-            (false, cur.as_ref().join(&normal)),
-            (false, normal.as_ref().join(&cur)),
-        ];
-        let paths = &[
-            (true, false, cur.clone()),
-            (true, true, normal.clone()),
-            (
-                true,
-                false,
-                cur.as_ref().join(&normal).as_ref().join(&parent),
-            ),
-            (
-                true,
-                false,
-                normal.as_ref().join(&cur).as_ref().join(&parent),
-            ),
-            (
-                true,
-                false,
-                normal.as_ref().join(&parent).as_ref().join(&cur),
-            ),
-            (
-                true,
-                true,
-                normal.as_ref().join(&parent).as_ref().join(&normal),
-            ),
-            (false, false, root.clone()),
-            (false, false, parent.clone()),
-            (
-                false,
-                false,
-                normal.as_ref().join(&parent).as_ref().join(&parent),
-            ),
-            (
-                false,
-                false,
-                normal
-                    .as_ref()
-                    .join(&parent)
-                    .as_ref()
-                    .join(&parent)
-                    .as_ref()
-                    .join(&normal),
-            ),
-        ];
-        for (dir_is_root, dir) in dirs {
-            // smoelius: Do not remove the next line. It is a sanity check that `is_root` works.
-            assert_eq!(*dir_is_root, dir.as_ref().is_root());
-            for (should_succeed_if_dir_is_not_root, but_only_if_relaxed, path) in paths {
-                assert!(*should_succeed_if_dir_is_not_root || !but_only_if_relaxed);
-                safe_join_guarantee(
-                    *should_succeed_if_dir_is_not_root || *dir_is_root,
-                    !but_only_if_relaxed,
-                    as_std_path(dir.as_ref()),
-                    as_std_path(path.as_ref()),
-                );
-            }
-        }
-        safe_join_guarantee(
-            true,
-            true,
-            as_std_path(root.as_ref()),
-            as_std_path(root.as_ref()),
-        );
-    }
-
-    fn safe_parent<P>(
-        from_str: impl Fn(&'static str) -> P::PathBuf,
-        as_std_path: impl Fn(&P) -> &Path,
-    ) where
-        P: ?Sized + PathOps + AsRef<P>,
-    {
-        let root = from_str("/");
-        let cur = from_str(".");
-        let parent = from_str("..");
-        let normal = from_str("x");
-        let dirs = &[
-            (true, true, root.clone()),
-            (true, true, root.as_ref().join(&parent)),
-            (true, true, cur.clone()),
-            (true, false, cur.as_ref().join(&normal)),
-            (true, false, normal.clone()),
-            (true, false, normal.as_ref().join(&cur)),
-            (
-                false,
-                false,
-                root.as_ref().join(&normal).as_ref().join(&parent),
-            ),
-            (false, false, parent.clone()),
-        ];
-        for (should_succeed, but_only_if_relaxed, dir) in dirs {
-            assert!(*should_succeed || !but_only_if_relaxed);
-            safe_parent_guarantee(
-                *should_succeed,
-                !but_only_if_relaxed,
-                as_std_path(dir.as_ref()),
-            );
-        }
-    }
-
-    #[cfg_attr(
-        feature = "fuzz",
-        derive(Clone, Debug, serde::Deserialize, serde::Serialize)
-    )]
-    struct PathBufWrapper(PathBuf);
-
-    impl From<&Path> for PathBufWrapper {
-        fn from(path: &Path) -> Self {
-            PathBufWrapper(path.to_path_buf())
-        }
-    }
-
-    #[cfg(feature = "fuzz")]
-    impl test_fuzz::Into<&Path> for PathBufWrapper {
-        fn into(self) -> &'static Path {
-            Box::leak(Box::new(self.0))
-        }
-    }
-
-    fn fresh_normal(paths: &[&Path]) -> String {
-        let n = paths
-            .iter()
-            .map(|path| path.components())
-            .flatten()
-            .fold(0, |n, component| {
-                if let Component::Normal(s) = component {
-                    max(n, s.len())
-                } else {
-                    n
-                }
-            });
-        format!("{:x>width$}", "", width = n + 1)
-    }
-
-    fn paternalize(n: usize, x: &str, path: &Path) -> PathBuf {
-        if path.has_root() {
-            path.to_path_buf()
-        } else {
-            let mut path_buf = PathBuf::new();
-            for _ in 0..n {
-                path_buf.push(x);
-            }
-            path_buf.join(path)
-        }
-    }
-
-    #[cfg_attr(
-        feature = "fuzz",
-        test_fuzz::test_fuzz(convert = "&Path, PathBufWrapper")
-    )]
-    fn safe_join_guarantee(expected: bool, relaxed: bool, dir: &Path, path: &Path) {
-        let normalization_functions: &[(&str, &dyn Fn(&Path) -> PathBuf)] = &[
-            ("normalize_path", &normalize_path),
-            ("lexiclean", &|path: &Path| Lexiclean::lexiclean(path)),
-            ("path_clean", &|path: &Path| {
-                PathClean::clean(&path.to_path_buf())
-            }),
-        ];
-        for (name, normalize) in normalization_functions {
-            if name == &"path_clean" && (dir.to_str().is_none() || path.to_str().is_none()) {
-                continue;
-            }
-
-            let n = dir.components().count() + path.components().count();
-            let x = fresh_normal(&[dir, path]);
-
-            let np = |path| normalize(&paternalize(n, &x, path));
-            let np_dir = np(dir);
-
-            let info = |prefix: &Path, np_dir_join_prefix: &Path| {
-                format!(
-                    "dir = {:?}, path = {:?}, prefix = {:?}, {}(paternalize(dir)) = {:?}, {}(paternalize(dir.join(prefix))) = {:?}",
-                    dir, path, prefix, name, np_dir, name, np_dir_join_prefix,
-                )
-            };
-
-            let np_dir_join_path = np(&dir.join(path));
-
-            let equal = np_dir == np_dir_join_path;
-
-            let left = if relaxed {
-                dir.relaxed_safe_join(path)
-            } else {
-                dir.safe_join(path)
-            }
-            .is_ok();
-
-            if !relaxed && equal {
-                assert!(!left, "{}", info(path, &np_dir_join_path));
-                return;
-            }
-
-            #[cfg(not(fuzzing))]
-            assert_eq!(left, expected, "{}", info(&path, &np_dir_join_path));
-
-            let mut right = true;
-
-            for prefix in path.ancestors() {
-                let np = |path| normalize(&paternalize(n, &x, path));
-                let np_dir_join_prefix = np(&dir.join(prefix));
-
-                right &= np_dir_join_prefix.starts_with(&np_dir);
-
-                if left {
-                    assert_eq!(left, right, "{}", info(&prefix, &np_dir_join_prefix));
-                }
-            }
-
-            if !left {
-                assert_eq!(left, right, "{}", info(&path, &np_dir_join_path));
-            }
-        }
-    }
-
-    #[cfg_attr(
-        feature = "fuzz",
-        test_fuzz::test_fuzz(convert = "&Path, PathBufWrapper")
-    )]
-    fn safe_parent_guarantee(expected: bool, relaxed: bool, dir: &Path) {
-        let normalization_functions: &[(&str, &dyn Fn(&Path) -> PathBuf)] = &[
-            ("normalize_path", &normalize_path),
-            ("lexiclean", &|path: &Path| Lexiclean::lexiclean(path)),
-            ("path_clean", &|path: &Path| {
-                PathClean::clean(&path.to_path_buf())
-            }),
-        ];
-        for (name, normalize) in normalization_functions {
-            if name == &"path_clean" && (dir.to_str().is_none()) {
-                continue;
-            }
-
-            let m = dir.components().count();
-            let x = fresh_normal(&[dir]);
-
-            let np = |path| normalize(&paternalize(m, &x, path));
-            let np_dir = np(dir);
-
-            let info = |np_dir_parent: Option<PathBuf>| {
-                let s = np_dir_parent.map_or(String::new(), |np_dir_parent| {
-                    format!(
-                        ", {}(paternalize(dir.parent())) = {:?}",
-                        name, np_dir_parent
-                    )
-                });
-                format!(
-                    "dir = {:?}, {}(paternalize(dir)) = {:?}{}",
-                    dir, name, np_dir, s,
-                )
-            };
-
-            let (np_dir_parent, equal, right) = match dir.parent() {
-                None => (None, dir == Path::new("") || dir.is_root(), true),
-                Some(dir_parent) => {
-                    let np_dir_parent = np(dir_parent);
-                    let equal = np_dir == np_dir_parent;
-                    let right = np_dir.starts_with(&np_dir_parent);
-                    (Some(np_dir_parent), equal, right)
-                }
-            };
-
-            let left = if relaxed {
-                dir.relaxed_safe_parent()
-            } else {
-                dir.safe_parent()
-            }
-            .is_ok();
-
-            if !relaxed && equal {
-                assert!(!left, "{}", info(np_dir_parent));
-                return;
-            }
-
-            #[cfg(not(fuzzing))]
-            assert_eq!(left, expected, "{}", info(np_dir_parent));
-
-            assert_eq!(left, right, "{}", info(np_dir_parent));
-        }
-    }
-
-    mod std_path {
-        use super::*;
-
-        #[test]
-        fn safe_join() {
-            super::safe_join(PathBuf::from, |path| path);
-        }
-
-        #[test]
-        fn safe_parent() {
-            super::safe_parent(PathBuf::from, |path| path);
-        }
-    }
-
-    #[cfg(feature = "camino")]
-    mod camino {
-        use ::camino::{Utf8Path, Utf8PathBuf};
-
-        #[test]
-        fn safe_join() {
-            super::safe_join(Utf8PathBuf::from, Utf8Path::as_std_path);
-        }
-
-        #[test]
-        fn safe_parent() {
-            super::safe_parent(Utf8PathBuf::from, Utf8Path::as_std_path);
-        }
-    }
+    impl_body! {camino::Utf8Component}
 }

@@ -6,6 +6,7 @@ name: Fuzz
 on:
   schedule:
     - cron: "0 3 * * 4"
+  workflow_dispatch:
 
 jobs:
   fuzz:
@@ -48,8 +49,8 @@ jobs:
 
       - name: Cargo test-fuzz
         run: |
-          cargo test      --features=fuzz ${{ matrix.target }}
-          cargo test-fuzz --features=fuzz ${{ matrix.target }}_guarantee --exit-code --run-until-crash -- -V 600
+          cargo test      --features=fuzz --test ${{ matrix.target }}
+          cargo test-fuzz --features=fuzz        ${{ matrix.target }}_guarantee --exit-code --run-until-crash -- -V 600
         env:
           AFL_AUTORESUME: 1
           AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES: 1
