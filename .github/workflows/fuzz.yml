@@ -41,7 +41,7 @@ jobs:
         run: sudo apt-get install llvm
 
       - name: Install afl
-        run: cargo install afl || true
+        run: cargo install afl --force
 
       - name: Install cargo-test-fuzz
         run: cargo install cargo-test-fuzz || true
