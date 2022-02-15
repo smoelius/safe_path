@@ -7,7 +7,7 @@ use safe_path::{PathOps, SafePath};
 use std::path::Path;
 
 mod common;
-use common::{fresh_normal, paternalize, NORMALIZATION_FUNCTIONS};
+use common::{adopt, fresh_normal, NORMALIZATION_FUNCTIONS};
 
 fn test_cases<P, F>(
     from_str: F,
@@ -91,12 +91,12 @@ fn safe_join_guarantee(expected: bool, relaxed: bool, dir: &Path, path: &Path) {
         let n = dir.components().count() + path.components().count();
         let x = fresh_normal(&[dir, path]);
 
-        let np = |path| normalize(&paternalize(n, &x, path));
+        let np = |path| normalize(&adopt(n, &x, path));
         let np_dir = np(dir);
 
         let info = |prefix: &Path, np_dir_join_prefix: &Path| {
             format!(
-                "dir = {:?}, path = {:?}, prefix = {:?}, {}(paternalize(dir)) = {:?}, {}(paternalize(dir.join(prefix))) = {:?}",
+                "dir = {:?}, path = {:?}, prefix = {:?}, {}(adopt(dir)) = {:?}, {}(adopt(dir.join(prefix))) = {:?}",
                 dir, path, prefix, name, np_dir, name, np_dir_join_prefix,
             )
         };
@@ -123,7 +123,7 @@ fn safe_join_guarantee(expected: bool, relaxed: bool, dir: &Path, path: &Path) {
         let mut right = true;
 
         for prefix in path.ancestors() {
-            let np = |path| normalize(&paternalize(n, &x, path));
+            let np = |path| normalize(&adopt(n, &x, path));
             let np_dir_join_prefix = np(&dir.join(prefix));
 
             right &= np_dir_join_prefix.starts_with(&np_dir);

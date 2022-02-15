@@ -40,7 +40,7 @@ pub fn fresh_normal(paths: &[&Path]) -> String {
     format!("{:x>width$}", "", width = n + 1)
 }
 
-pub fn paternalize(n: usize, x: &str, path: &Path) -> PathBuf {
+pub fn adopt(n: usize, x: &str, path: &Path) -> PathBuf {
     if path.has_root() {
         path.to_path_buf()
     } else {

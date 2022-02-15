@@ -36,12 +36,12 @@ dir.relaxed_safe_join(path).is_ok()
 ```
 if-and-only-if, for every prefix `prefix` of `path`,
 ```rust
-normalize(paternalize_n_x(dir.join(prefix)))
+normalize(adopt_n_x(dir.join(prefix)))
     .starts_with(
-        normalize(paternalize_n_x(dir))
+        normalize(adopt_n_x(dir))
     )
 ```
-where the `paternalize_n_x` and `normalize` functions are as follows.
+where the `adopt_n_x` and `normalize` functions are as follows.
 
 Let *n* be the total number of components in both `dir` and `path`. (Why this choice of *n*?
 Because this is an upper bound on the number of parent directories that `dir.join(path)`
@@ -49,15 +49,15 @@ could possibly escape.)
 
 Let *x* be any normal component that does not appear in either `dir` or `path`.
 
-A call of the form `paternalize_n_x(path)`:
+A call of the form `adopt_n_x(path)`:
 * prepends *n* copies of *x* to `path`, if `path` is relative
 * returns `path` as-is, if `path` is absolute
 
 For example, suppose `dir` is `./w` and `path` is `y/../../z`. Then *n* is 6. Furthermore, `x`
-is a normal component not in `dir` or `path`. So `paternalize_n_x(dir)` and
-`paternalize_n_x(dir.join(path))` could be as follows:
-* `paternalize_n_x(dir) = x/x/x/x/x/x/./w`
-* `paternalize_n_x(dir.join(path)) = x/x/x/x/x/x/./w/y/../../z`
+is a normal component not in `dir` or `path`. So `adopt_n_x(dir)` and
+`adopt_n_x(dir.join(path))` could be as follows:
+* `adopt_n_x(dir) = x/x/x/x/x/x/./w`
+* `adopt_n_x(dir.join(path)) = x/x/x/x/x/x/./w/y/../../z`
 
 There are several path normalization functions implemented in Rust. The ones that we know about
 are listed below. To the best of our knowledge, the above guarantee holds using any one of them
@@ -75,9 +75,9 @@ if-and-only-if
 match dir.parent() {
     None => true,
     Some(parent) => {
-        normalize(paternalize_m_x(dir))
+        normalize(adopt_m_x(dir))
             .starts_with(
-                normalize(paternalize_m_x(parent))
+                normalize(adopt_m_x(parent))
             )
     }
 }

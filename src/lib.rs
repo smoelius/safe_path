@@ -44,16 +44,16 @@
 //! if-and-only-if, for every prefix `prefix` of `path`,
 //! ```
 //! # fn normalize(path: std::path::PathBuf) -> std::path::PathBuf { path }
-//! # fn paternalize_n_x(path: std::path::PathBuf) -> std::path::PathBuf { path }
+//! # fn adopt_n_x(path: std::path::PathBuf) -> std::path::PathBuf { path }
 //! # let dir = std::path::PathBuf::new();
 //! # let prefix = std::path::PathBuf::new();
-//! normalize(paternalize_n_x(dir.join(prefix)))
+//! normalize(adopt_n_x(dir.join(prefix)))
 //!     .starts_with(
-//!         normalize(paternalize_n_x(dir))
+//!         normalize(adopt_n_x(dir))
 //!     )
 //! # ;
 //! ```
-//! where the `paternalize_n_x` and `normalize` functions are as follows.
+//! where the `adopt_n_x` and `normalize` functions are as follows.
 //!
 //! Let *n* be the total number of components in both `dir` and `path`. (Why this choice of *n*?
 //! Because this is an upper bound on the number of parent directories that `dir.join(path)`
@@ -61,15 +61,15 @@
 //!
 //! Let *x* be any normal component that does not appear in either `dir` or `path`.
 //!
-//! A call of the form `paternalize_n_x(path)`:
+//! A call of the form `adopt_n_x(path)`:
 //! * prepends *n* copies of *x* to `path`, if `path` is relative
 //! * returns `path` as-is, if `path` is absolute
 //!
 //! For example, suppose `dir` is `./w` and `path` is `y/../../z`. Then *n* is 6. Furthermore, `x`
-//! is a normal component not in `dir` or `path`. So `paternalize_n_x(dir)` and
-//! `paternalize_n_x(dir.join(path))` could be as follows:
-//! * `paternalize_n_x(dir) = x/x/x/x/x/x/./w`
-//! * `paternalize_n_x(dir.join(path)) = x/x/x/x/x/x/./w/y/../../z`
+//! is a normal component not in `dir` or `path`. So `adopt_n_x(dir)` and
+//! `adopt_n_x(dir.join(path))` could be as follows:
+//! * `adopt_n_x(dir) = x/x/x/x/x/x/./w`
+//! * `adopt_n_x(dir.join(path)) = x/x/x/x/x/x/./w/y/../../z`
 //!
 //! There are several path normalization functions implemented in Rust. The ones that we know about
 //! are listed below. To the best of our knowledge, the above guarantee holds using any one of them
@@ -89,14 +89,14 @@
 //! if-and-only-if
 //! ```
 //! # fn normalize(path: std::path::PathBuf) -> std::path::PathBuf { path }
-//! # fn paternalize_m_x<P: AsRef<std::path::Path>>(path: P) -> std::path::PathBuf { path.as_ref().to_path_buf() }
+//! # fn adopt_m_x<P: AsRef<std::path::Path>>(path: P) -> std::path::PathBuf { path.as_ref().to_path_buf() }
 //! # let dir = std::path::Path::new("");
 //! match dir.parent() {
 //!     None => true,
 //!     Some(parent) => {
-//!         normalize(paternalize_m_x(dir))
+//!         normalize(adopt_m_x(dir))
 //!             .starts_with(
-//!                 normalize(paternalize_m_x(parent))
+//!                 normalize(adopt_m_x(parent))
 //!             )
 //!     }
 //! }

@@ -7,7 +7,7 @@ use safe_path::{PathOps, SafePath};
 use std::path::{Path, PathBuf};
 
 mod common;
-use common::{fresh_normal, paternalize, NORMALIZATION_FUNCTIONS};
+use common::{adopt, fresh_normal, NORMALIZATION_FUNCTIONS};
 
 fn test_cases<P, F>(from_str: F) -> Vec<(bool, bool, P::PathBuf)>
 where
@@ -48,20 +48,14 @@ fn safe_parent_guarantee(expected: bool, relaxed: bool, dir: &Path) {
         let m = dir.components().count();
         let x = fresh_normal(&[dir]);
 
-        let np = |path| normalize(&paternalize(m, &x, path));
+        let np = |path| normalize(&adopt(m, &x, path));
         let np_dir = np(dir);
 
         let info = |np_dir_parent: Option<PathBuf>| {
             let s = np_dir_parent.map_or(String::new(), |np_dir_parent| {
-                format!(
-                    ", {}(paternalize(dir.parent())) = {:?}",
-                    name, np_dir_parent
-                )
+                format!(", {}(adopt(dir.parent())) = {:?}", name, np_dir_parent)
             });
-            format!(
-                "dir = {:?}, {}(paternalize(dir)) = {:?}{}",
-                dir, name, np_dir, s,
-            )
+            format!("dir = {:?}, {}(adopt(dir)) = {:?}{}", dir, name, np_dir, s,)
         };
 
         let (np_dir_parent, equal, right) = match dir.parent() {
