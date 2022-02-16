@@ -43,9 +43,9 @@ normalize(adopt_n_x(dir.join(prefix)))
 ```
 where the `adopt_n_x` and `normalize` functions are as follows.
 
-Let *n* be the total number of components in both `dir` and `path`. (Why this choice of *n*?
-Because this is an upper bound on the number of parent directories that `dir.join(path)`
-could possibly escape.)
+Let *n* be one more than total number of components in `dir`. (Why this choice of *n*? Because
+`dir` could contain `..`. This is one more than the number of parent directories `dir` could
+possibly escape.)
 
 Let *x* be any normal component that does not appear in either `dir` or `path`.
 
@@ -53,11 +53,11 @@ A call of the form `adopt_n_x(path)`:
 * prepends *n* copies of *x* to `path`, if `path` is relative
 * returns `path` as-is, if `path` is absolute
 
-For example, suppose `dir` is `./w` and `path` is `y/../../z`. Then *n* is 6. Furthermore, `x`
+For example, suppose `dir` is `../w` and `path` is `y/../../z`. Then *n* is 3. Furthermore, `x`
 is a normal component not in `dir` or `path`. So `adopt_n_x(dir)` and
-`adopt_n_x(dir.join(path))` could be as follows:
-* `adopt_n_x(dir) = x/x/x/x/x/x/./w`
-* `adopt_n_x(dir.join(path)) = x/x/x/x/x/x/./w/y/../../z`
+`adopt_n_x(dir)` could be as follows:
+* `adopt_n_x(dir) = x/x/x/./w`
+* `adopt_n_x(dir.join(path)) = x/x/x/../w/y/../../z`
 
 There are several path normalization functions implemented in Rust. The ones that we know about
 are listed below. To the best of our knowledge, the above guarantee holds using any one of them

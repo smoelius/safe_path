@@ -88,7 +88,7 @@ fn safe_join_guarantee(expected: bool, relaxed: bool, dir: &Path, path: &Path) {
             continue;
         }
 
-        let n = dir.components().count() + path.components().count();
+        let n = 1 + dir.components().count();
         let x = fresh_normal(&[dir, path]);
 
         let np = |path| normalize(&adopt(n, &x, path));
