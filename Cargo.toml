@@ -11,7 +11,7 @@ description = "To help prevent directory traversal attacks"
 [dependencies]
 camino = { version = "1.0.7", optional = true }
 serde = { version = "1.0.136", optional = true }
-test-fuzz = { version = "2.0.2", optional = true }
+test-fuzz = { version = "3.0.1", optional = true }
 
 [build-dependencies]
 rustc_version = "0.4.0"
